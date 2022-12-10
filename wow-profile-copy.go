@@ -1,0 +1,388 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"io"
+	"log"
+	"runtime"
+	"regexp"
+	"path/filepath"
+	"github.com/pterm/pterm"
+	"strings"
+	// "github.com/pterm/pterm/putils" 
+)
+
+type WowInstall struct {
+	availableVersions []string
+	installDirectory string
+}
+
+type Wtf struct {
+	account string
+	server string
+	character string
+}
+
+type CopyTarget struct {
+	wtf Wtf
+	version string
+}
+
+// smelly?
+var _wowInstanceFolderNames = map[string]string{
+		"_classic_": "WoTLK Classic",
+		"_classic_ptr_": "WoTLK Classic PTR",
+		"_classic_beta_": "WoTLK Classic Beta",
+		"_retail_": "Retail",
+	}
+
+var _probableWowInstallLocations = map[string]string{
+		"darwin": "/Applications/World of Warcraft",
+		"windows": "C:\\Program Files (x86)\\World of Warcraft",
+	}
+
+
+//
+//
+// WoWInstall methods
+//
+//
+
+// Finds all valid WTF configs (account, server, character) for a given WoW version
+func (wow WowInstall) getWtfConfigurations(version string) []Wtf {
+	var configurations []Wtf
+	accountRegex := regexp.MustCompile(`[0-9]*#[0-9]*`)
+
+	wtfPath := filepath.Join(wow.installDirectory, version, "WTF", "Account") // a fitting name
+
+	// enumerate available accounts on this instance
+	wtfFiles, err := os.ReadDir(wtfPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// this is O(n)^3 - consider lazy loading or refactoring?
+	for _, acct := range wtfFiles {
+		if acct.IsDir() && accountRegex.MatchString(acct.Name()) { // make sure that this directory matches the account number format
+			accountPath := filepath.Join(wtfPath, acct.Name())
+			serverFiles, err := os.ReadDir(accountPath) // enumerate available servers under each account
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, server := range serverFiles {
+				if server.IsDir() && server.Name() != "SavedVariables" { // assume that any folder that isn't SavedVariables here is a realm
+					serverPath := filepath.Join(accountPath, server.Name())
+					characterFiles, err := os.ReadDir(serverPath)
+					if err != nil {
+						log.Fatal(err)
+					}
+					for _, character := range characterFiles { // any subdirectories of the server directories are characters, they have arbitrary names
+						if character.IsDir() {
+							finalWtf := Wtf{
+								account: acct.Name(),
+								server: server.Name(),
+								character: character.Name(),
+							}
+							configurations = append(configurations, finalWtf)
+						}
+					}
+				}
+			}
+		}
+	}
+	return configurations
+}
+
+// determines which WoW versions are available in a given WoW install directory (classic, retail, SoM, etc..)
+func (wow *WowInstall) findAvailableVersions(dir string) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		// if this directory contains a wow instance folder name, it's probably where WoW is installed
+		_, matchesInstanceName := _wowInstanceFolderNames[file.Name()]
+		if file.IsDir() && matchesInstanceName {
+			wow.availableVersions = append(wow.availableVersions, file.Name())
+		}
+	}
+}
+
+// prompts the user to select a WTF tuple to copy to/from
+// isSource: whether we are selecting the source of the copy or the destination
+func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
+	var preposition = "to"
+	if isSource {
+		preposition = "from"
+	} 
+
+	var versions []string
+
+	for _, version := range wow.availableVersions {
+		versions = append(versions, version)
+	}
+
+	wowVersion, _ := pterm.DefaultInteractiveSelect.
+		WithOptions(versions).
+		WithDefaultText(fmt.Sprintf("WoW Version to copy %s", preposition)).
+		Show()
+	pterm.Debug.Printfln("chose %s", wowVersion)
+
+	wtfConfigs := wow.getWtfConfigurations(wowVersion)
+
+	var accountOptions []string
+	for _, wtf := range wtfConfigs {
+		accountOptions = append(accountOptions, wtf.account)
+	}
+	accountOptions = deduplicateStringSlice(accountOptions)
+
+	chosenAccount, _ := pterm.DefaultInteractiveSelect.
+		WithOptions(accountOptions).
+		WithDefaultText(fmt.Sprintf("Account to copy %s", preposition)).
+		Show()
+	pterm.Debug.Printfln("chose %s", chosenAccount)
+
+	var serverOptions []string
+	for _, wtf := range wtfConfigs {
+		if wtf.account == chosenAccount {
+			serverOptions = append(serverOptions, wtf.server)
+		}
+	}
+	serverOptions = deduplicateStringSlice(serverOptions)
+
+	chosenServer, _ := pterm.DefaultInteractiveSelect.
+		WithOptions(serverOptions).
+		WithDefaultText(fmt.Sprintf("Server to copy %s", preposition)).
+		Show()
+	pterm.Debug.Printfln("chose %s", chosenServer)
+
+	var characterOptions []string
+	for _, wtf := range wtfConfigs {
+		if wtf.account == chosenAccount && wtf.server == chosenServer {
+			characterOptions = append(characterOptions, wtf.character)
+		}
+	}
+
+	chosenCharacter, _ := pterm.DefaultInteractiveSelect.
+		WithOptions(characterOptions).
+		WithDefaultText(fmt.Sprintf("Character to copy %s", preposition)).
+		Show()
+	pterm.Debug.Printfln("chose %s", chosenCharacter)
+
+	return CopyTarget{
+		wtf: Wtf{
+			account: chosenAccount,
+			server: chosenServer,
+			character: chosenCharacter,
+		},
+		version: wowVersion,
+	}
+}
+
+//
+//
+// helper functions
+//
+//
+
+// determines if a given path appears to contain a WoW install
+func isWowInstallDirectory(dir string) bool {
+	var isInstallDir = false
+
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		// if this directory contains a wow instance folder name, it's probably where WoW is installed
+		_, matchesInstanceName := _wowInstanceFolderNames[file.Name()]
+		if file.IsDir() && matchesInstanceName {
+			isInstallDir = true
+			break
+		}
+	}
+
+	return isInstallDir
+}
+
+// func promptForWowDirectory()
+
+// deduplicates slices by throwing them into a map 
+// not mine, credit to @kylewbanks
+func deduplicateStringSlice(input []string) []string {
+	u := make([]string, 0, len(input))
+	m := make(map[string]bool)
+	for _, val := range input {
+		if _, ok := m[val]; !ok {
+			m[val] = true
+			u = append(u, val)
+		}
+	}
+	return u
+}
+
+// small wrapper around os and io to copy files from source to destination
+func copyFile(src string, dest string) (bytes int64, err error) {
+	srcFileHandle, err := os.Open(src)
+	if err != nil {
+		return -1, err
+	}
+	defer srcFileHandle.Close()
+
+	dstFileHandle, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return -1, err
+	}
+	defer dstFileHandle.Close()
+
+	bytes, err = io.Copy(dstFileHandle, srcFileHandle)
+	return bytes, err
+}
+
+func main() {
+	var wow WowInstall
+
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_probableWowInstallLocations["linux"] = fmt.Sprintf("%s/.var/app/com.usebottles.bottles/data/bottles/bottles/WoW/drive_c/Program Files (x86)/World of Warcraft", userHomeDir)
+
+	// todo: scan bottles directories and lutris directories when GOOS='linux'
+	installLocation, osExists := _probableWowInstallLocations[runtime.GOOS]
+	if !osExists {
+		panic("Can't find WoW install.")
+		// todo: implement this
+		// installLocation := promptForWowDirectory();
+	}
+
+	dirOk := isWowInstallDirectory(installLocation);
+	if dirOk {
+		wow.installDirectory = installLocation
+		wow.findAvailableVersions(installLocation)
+	}
+
+	pterm.DefaultHeader.Printfln("WoW Install Directory: %s", wow.installDirectory)	
+
+	srcConfig := wow.selectWtf(true)
+	dstConfig := wow.selectWtf(false)
+
+	pterm.Info.Printfln("Source: { Version: %s, Account: %s, Server: %s, Character: %s }", _wowInstanceFolderNames[srcConfig.version], srcConfig.wtf.account, srcConfig.wtf.server, srcConfig.wtf.character)
+	pterm.Info.Printfln("Destination: { Version: %s, Account :%s, Server: %s, Character: %s }", _wowInstanceFolderNames[dstConfig.version], dstConfig.wtf.account, dstConfig.wtf.server, dstConfig.wtf.character)
+
+	confirmation, _ := pterm.DefaultInteractiveConfirm.
+		WithDefaultText("Copy Keybindings, Macros, and SavedVariables? This can cause data loss - make a backup!").
+		Show()
+	if !confirmation {
+		os.Exit(1)
+	}
+
+	//
+	// account-level client configuration
+	//
+
+	srcWtfAccountPath := filepath.Join(wow.installDirectory, srcConfig.version, "WTF", "Account", srcConfig.wtf.account)
+	dstWtfAccountPath := filepath.Join(wow.installDirectory, dstConfig.version, "WTF", "Account", dstConfig.wtf.account)
+
+	accountFilesToCopy := [3]string{"bindings-cache.wtf", "config-cache.wtf", "macros-cache.txt"}
+
+	for _, file := range accountFilesToCopy {
+		src := filepath.Join(srcWtfAccountPath, file)
+		dst := filepath.Join(dstWtfAccountPath, file)
+		_, err := copyFile(src, dst)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pterm.Info.Printfln("Copied %s", src)
+	}
+
+	//
+	// character-level client configuration
+	//
+
+	srcWtfCharacterPath := filepath.Join(srcWtfAccountPath, srcConfig.wtf.server, srcConfig.wtf.character)
+	dstWtfCharacterPath := filepath.Join(dstWtfAccountPath, dstConfig.wtf.server, dstConfig.wtf.character)
+
+	characterFilesToCopy := [3]string{"AddOns.txt", "config-cache.wtf", "layout-local.txt"}
+
+	for _, file := range characterFilesToCopy {
+		src := filepath.Join(srcWtfCharacterPath, file)
+		dst := filepath.Join(dstWtfCharacterPath, file)
+		_, err := copyFile(src, dst)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pterm.Info.Printfln("Copied %s", src)
+	}
+
+	//
+	// account-level saved variables
+	//
+
+	svFileRegex := regexp.MustCompile(`.*\.lua$`)
+
+	accountSavedVariablesFiles, err := os.ReadDir(filepath.Join(srcWtfAccountPath, "SavedVariables"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range accountSavedVariablesFiles {
+		if svFileRegex.MatchString(file.Name()) {
+			src := filepath.Join(srcWtfAccountPath, "SavedVariables", file.Name())
+			dst := filepath.Join(dstWtfAccountPath, "SavedVariables", file.Name())
+			_, err := copyFile(src, dst)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pterm.Info.Printfln("Copied %s", src)
+		}
+	}
+
+	//
+	// character-level saved variables
+	//
+
+	charSavedVariablesFiles, err := os.ReadDir(filepath.Join(srcWtfCharacterPath, "SavedVariables"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range charSavedVariablesFiles {
+		if svFileRegex.MatchString(file.Name()) {
+			src := filepath.Join(srcWtfCharacterPath, "SavedVariables", file.Name())
+			dst := filepath.Join(dstWtfCharacterPath, "SavedVariables", file.Name())
+			_, err := copyFile(src, dst)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pterm.Info.Printfln("Copied %s", src)
+		}
+	}
+
+	//
+	// clean up
+	//
+	dstAccountCache := filepath.Join(dstWtfAccountPath, "cache.md5")
+	err = os.Remove(dstAccountCache)
+	if err != nil {
+		if !strings.Contains(err.Error(), "no such file or directory") {
+			log.Fatal(err)
+		}
+	}
+
+	pterm.Info.Printfln("Removed %s", dstAccountCache)
+
+	dstCharacterCache := filepath.Join(dstWtfCharacterPath, "cache.md5")
+	err = os.Remove(dstCharacterCache)
+	if err != nil {
+		if !strings.Contains(err.Error(), "no such file or directory") {
+			log.Fatal(err)
+		}
+	}
+
+	pterm.Info.Printfln("Removed %s", dstCharacterCache)
+}
