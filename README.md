@@ -15,7 +15,7 @@ When logged in, put this in the chat window:
 /console synchronizeBindings 0
 ```
 
-Re-run the sync.
+Close the game, Re-run the sync.
 
 Open the game, and run:
 ```
