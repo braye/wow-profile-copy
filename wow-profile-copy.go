@@ -193,7 +193,8 @@ func isWowInstallDirectory(dir string) bool {
 
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		log.Fatal(err)
+		// directory probably doesn't exist
+		return false
 	}
 
 	for _, file := range files {
@@ -208,7 +209,36 @@ func isWowInstallDirectory(dir string) bool {
 	return isInstallDir
 }
 
-// func promptForWowDirectory()
+func promptForWowDirectory(dir string) (wowDir string, err error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+
+	var fileChoices = []string{".. (go back)"}
+
+	for _, file := range files {
+		fileChoices = append(fileChoices, file.Name())
+	}
+
+	selectedFile, _ := pterm.DefaultInteractiveSelect.
+		WithOptions(fileChoices).
+		WithDefaultText("Select a WoW Install directory").
+		WithMaxHeight(15).
+		Show()
+	var fullSelectedPath string
+	if selectedFile == ".. (go back)" {
+		fullSelectedPath = filepath.Clean(filepath.Join(dir, ".."))
+	} else {
+		fullSelectedPath = filepath.Join(dir, selectedFile)
+	}
+	isWowDir := isWowInstallDirectory(fullSelectedPath)
+	if !isWowDir {
+		return promptForWowDirectory(fullSelectedPath)
+	} else {
+		return fullSelectedPath, nil
+	}
+}
 
 // deduplicates slices by throwing them into a map 
 // not mine, credit to @kylewbanks
@@ -252,19 +282,24 @@ func main() {
 
 	_probableWowInstallLocations["linux"] = fmt.Sprintf("%s/.var/app/com.usebottles.bottles/data/bottles/bottles/WoW/drive_c/Program Files (x86)/World of Warcraft", userHomeDir)
 
-	// todo: scan bottles directories and lutris directories when GOOS='linux'
-	installLocation, osExists := _probableWowInstallLocations[runtime.GOOS]
-	if !osExists {
-		panic("Can't find WoW install.")
-		// todo: implement this
-		// installLocation := promptForWowDirectory();
-	}
+	// this will crash when not on linux, macOS, or windows
+	// if you're trying to run wow on BSD or plan9, you can probably fix this yourself
+	installLocation := _probableWowInstallLocations[runtime.GOOS]
 
 	dirOk := isWowInstallDirectory(installLocation);
-	if dirOk {
-		wow.installDirectory = installLocation
-		wow.findAvailableVersions(installLocation)
+	if !dirOk {
+		base := "/"
+		if runtime.GOOS == "windows" {
+			baseInput, _ := pterm.DefaultInteractiveTextInput.
+				WithDefaultText("Which drive is WoW located on? e.g. C, D").
+				Show()
+			base = fmt.Sprintf("%s:\\", string(baseInput[0]))
+		}
+		installLocation, _ = promptForWowDirectory(base);
 	}
+
+	wow.installDirectory = installLocation
+	wow.findAvailableVersions(installLocation)
 
 	pterm.DefaultHeader.Printfln("WoW Install Directory: %s", wow.installDirectory)	
 
