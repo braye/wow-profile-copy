@@ -342,7 +342,7 @@ func main() {
 	srcWtfCharacterPath := filepath.Join(srcWtfAccountPath, srcConfig.wtf.server, srcConfig.wtf.character)
 	dstWtfCharacterPath := filepath.Join(dstWtfAccountPath, dstConfig.wtf.server, dstConfig.wtf.character)
 
-	characterFilesToCopy := [3]string{"AddOns.txt", "config-cache.wtf", "layout-local.txt"}
+	characterFilesToCopy := [4]string{"AddOns.txt", "config-cache.wtf", "layout-local.txt", "macros-cache.txt"}
 
 	for _, file := range characterFilesToCopy {
 		src := filepath.Join(srcWtfCharacterPath, file)
