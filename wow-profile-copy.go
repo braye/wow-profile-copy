@@ -262,7 +262,7 @@ func copyFile(src string, dest string) (bytes int64, err error) {
 	}
 	defer srcFileHandle.Close()
 
-	dstFileHandle, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0755)
+	dstFileHandle, err := os.Create(dest)
 	if err != nil {
 		return -1, err
 	}
