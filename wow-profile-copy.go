@@ -293,10 +293,10 @@ func main() {
 	// this will crash when not on linux, macOS, or windows
 	// if you're trying to run wow on BSD or plan9, you can probably fix this yourself
 	installLocation := _probableWowInstallLocations[runtime.GOOS]
+	base := "/"
 
 	dirOk := isWowInstallDirectory(installLocation);
 	if !dirOk {
-		base := "/"
 		if runtime.GOOS == "windows" {
 			baseInput, _ := pterm.DefaultInteractiveTextInput.
 				WithDefaultText("Which drive is WoW located on? e.g. C, D").
@@ -304,6 +304,15 @@ func main() {
 			base = fmt.Sprintf("%s:\\", string(baseInput[0]))
 		}
 		installLocation, _ = promptForWowDirectory(base);
+	}
+
+	pterm.Success.Printfln("Found WoW install. Location: %s", installLocation)
+
+	dirConfirm, _ := pterm.DefaultInteractiveConfirm.
+		WithDefaultText("Is this directory correct?").
+		Show()
+	if !dirConfirm {
+		installLocation, _ = promptForWowDirectory(base)
 	}
 
 	wow.installDirectory = installLocation
