@@ -52,7 +52,6 @@ var _probableWowInstallLocations = map[string]string{
 // Finds all valid WTF configs (account, server, character) for a given WoW version
 func (wow WowInstall) getWtfConfigurations(version string) []Wtf {
 	var configurations []Wtf
-	accountRegex := regexp.MustCompile(`[0-9]*#[0-9]*`)
 
 	wtfPath := filepath.Join(wow.installDirectory, version, "WTF", "Account") // a fitting name
 
@@ -62,9 +61,9 @@ func (wow WowInstall) getWtfConfigurations(version string) []Wtf {
 		log.Fatal(err)
 	}
 
-	// this is O(n)^3 - consider lazy loading or refactoring?
+	// search all directories in WTF/Account
 	for _, acct := range wtfFiles {
-		if acct.IsDir() && accountRegex.MatchString(acct.Name()) { // make sure that this directory matches the account number format
+		if acct.IsDir() && acct.Name() != "SavedVariables" {
 			accountPath := filepath.Join(wtfPath, acct.Name())
 			serverFiles, err := os.ReadDir(accountPath) // enumerate available servers under each account
 			if err != nil {
@@ -131,6 +130,15 @@ func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
 	pterm.Debug.Printfln("chose %s", wowVersion)
 
 	wtfConfigs := wow.getWtfConfigurations(wowVersion)
+	if len(wtfConfigs) == 0 {
+		pterm.Error.Printfln("No valid WTF configurations found in %s. Try logging into a character on this version of the client, first!", wowVersion)
+		if runtime.GOOS == "windows" {
+			// make windows users feel at home
+			fmt.Println("Press Enter to continue...")
+			fmt.Scanln()
+		}
+		os.Exit(1)
+	}
 
 	var accountOptions []string
 	for _, wtf := range wtfConfigs {
@@ -301,16 +309,19 @@ func main() {
 	wow.installDirectory = installLocation
 	wow.findAvailableVersions(installLocation)
 
-	pterm.DefaultHeader.Printfln("WoW Install Directory: %s", wow.installDirectory)	
+	pterm.DefaultHeader.Printfln("WoW Install Directory: %s", wow.installDirectory)
 
+	pterm.Info.Println("First, pick the Version, Account, Server, and Character to copy configuration data from.")
 	srcConfig := wow.selectWtf(true)
+	pterm.Info.Println("Next, pick the Version, Account, Server, and Character to apply that configuration data to.")
 	dstConfig := wow.selectWtf(false)
 
 	pterm.Info.Printfln("Source: { Version: %s, Account: %s, Server: %s, Character: %s }", _wowInstanceFolderNames[srcConfig.version], srcConfig.wtf.account, srcConfig.wtf.server, srcConfig.wtf.character)
 	pterm.Info.Printfln("Destination: { Version: %s, Account :%s, Server: %s, Character: %s }", _wowInstanceFolderNames[dstConfig.version], dstConfig.wtf.account, dstConfig.wtf.server, dstConfig.wtf.character)
 
 	confirmation, _ := pterm.DefaultInteractiveConfirm.
-		WithDefaultText("Copy Keybindings, Macros, and SavedVariables? This can cause data loss - make a backup!").
+		WithTextStyle(&pterm.ThemeDefault.WarningMessageStyle).
+		WithDefaultText(fmt.Sprintf("Overwrite %s-%s's Keybindings, Macros, and SavedVariables?\nThis can cause data loss - make a backup if unsure!", dstConfig.wtf.character, dstConfig.wtf.server)).
 		Show()
 	if !confirmation {
 		os.Exit(1)
@@ -420,4 +431,10 @@ func main() {
 	}
 
 	pterm.Info.Printfln("Removed %s", dstCharacterCache)
+	pterm.Success.Println("All files copied successfully!")
+
+	if runtime.GOOS == "windows" {
+		fmt.Println("Press Enter to continue...")
+		fmt.Scanln()
+	}
 }
