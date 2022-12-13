@@ -10,7 +10,9 @@ It does not currently copy client settings (graphics, sound levels, etc) between
 
 Disable keybind synchronization.
 
-When logged in, put this in the chat window:
+Log into the game version that configs are being copied to.
+
+Type this in the chat window:
 ```
 /console synchronizeBindings 0
 ```
@@ -21,6 +23,8 @@ Open the game, and run:
 ```
 /console synchronizeBindings 1
 ```
+In the chat window.
+
 Change *any* key binding, and apply the changes - you can change it back later.
 
 This "tricks" the WoW client into accepting the new keybindings, and saving them to Blizzard's servers. Otherwise, it sees that the keybindings for the account don't match the ones saved on the server, and "helpfully" changes them.
