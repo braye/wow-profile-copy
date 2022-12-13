@@ -109,26 +109,42 @@ func (wow *WowInstall) findAvailableVersions(dir string) {
 	}
 }
 
-// prompts the user to select a WTF tuple to copy to/from
+// prompts the user to select a wow game version, and a WTF tuple to copy to/from
+// wtf tuples are (account, server, character)
 // isSource: whether we are selecting the source of the copy or the destination
 func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
-	var preposition = "to"
+	preposition := "to"
 	if isSource {
 		preposition = "from"
-	} 
+	}
 
+	optionsHiddenText := "[Some options hidden, use arrow keys to reveal]"
+	const selectHeight = 15
 	var versions []string
+
+	//
+	// prompt for WoW version
+	//
 
 	for _, version := range wow.availableVersions {
 		versions = append(versions, version)
 	}
 
+	defaultText := fmt.Sprintf("WoW Version to copy %s", preposition)
+	// give the user an indication that they can scroll the selection window
+	if len(versions) > selectHeight {
+		defaultText = fmt.Sprintf("WoW Version to copy %s %s", preposition, optionsHiddenText)
+	}
+
 	wowVersion, _ := pterm.DefaultInteractiveSelect.
 		WithOptions(versions).
-		WithDefaultText(fmt.Sprintf("WoW Version to copy %s", preposition)).
+		WithDefaultText(defaultText).
+		WithMaxHeight(selectHeight).
 		Show()
 	pterm.Debug.Printfln("chose %s", wowVersion)
 
+	// validate that the chosen wow version actually has configurations to copy from/to
+	// wtf configs are only generated when you login to a character
 	wtfConfigs := wow.getWtfConfigurations(wowVersion)
 	if len(wtfConfigs) == 0 {
 		pterm.Error.Printfln("No valid WTF configurations found in %s. Try logging into a character on this version of the client, first!", wowVersion)
@@ -140,17 +156,32 @@ func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
 		os.Exit(1)
 	}
 
+	//
+	// prompt for account
+	//
+
 	var accountOptions []string
 	for _, wtf := range wtfConfigs {
 		accountOptions = append(accountOptions, wtf.account)
 	}
 	accountOptions = deduplicateStringSlice(accountOptions)
 
+	if len(accountOptions) > selectHeight {
+		defaultText = fmt.Sprintf("Account to copy %s %s", preposition, optionsHiddenText)
+	} else {
+		defaultText = fmt.Sprintf("Account to copy %s", preposition)
+	}
+
 	chosenAccount, _ := pterm.DefaultInteractiveSelect.
 		WithOptions(accountOptions).
-		WithDefaultText(fmt.Sprintf("Account to copy %s", preposition)).
+		WithDefaultText(defaultText).
+		WithMaxHeight(selectHeight).
 		Show()
 	pterm.Debug.Printfln("chose %s", chosenAccount)
+
+	//
+	// prompt for server
+	//
 
 	var serverOptions []string
 	for _, wtf := range wtfConfigs {
@@ -160,11 +191,22 @@ func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
 	}
 	serverOptions = deduplicateStringSlice(serverOptions)
 
+	if len(serverOptions) > selectHeight {
+		defaultText = fmt.Sprintf("Server to copy %s %s", preposition, optionsHiddenText)
+	} else {
+		defaultText = fmt.Sprintf("Server to copy %s", preposition)
+	}
+
 	chosenServer, _ := pterm.DefaultInteractiveSelect.
 		WithOptions(serverOptions).
 		WithDefaultText(fmt.Sprintf("Server to copy %s", preposition)).
+		WithMaxHeight(selectHeight).
 		Show()
 	pterm.Debug.Printfln("chose %s", chosenServer)
+
+	//
+	// prompt for character
+	//
 
 	var characterOptions []string
 	for _, wtf := range wtfConfigs {
@@ -173,9 +215,16 @@ func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
 		}
 	}
 
+	if len(characterOptions) > selectHeight {
+		defaultText = fmt.Sprintf("Character to copy %s %s", preposition, optionsHiddenText)
+	} else {
+		defaultText = fmt.Sprintf("Character to copy %s", preposition)
+	}
+
 	chosenCharacter, _ := pterm.DefaultInteractiveSelect.
 		WithOptions(characterOptions).
-		WithDefaultText(fmt.Sprintf("Character to copy %s", preposition)).
+		WithDefaultText(defaultText).
+		WithMaxHeight(selectHeight).
 		Show()
 	pterm.Debug.Printfln("chose %s", chosenCharacter)
 
@@ -310,6 +359,7 @@ func main() {
 
 	dirConfirm, _ := pterm.DefaultInteractiveConfirm.
 		WithDefaultText("Is this directory correct?").
+		WithDefaultValue(true).
 		Show()
 	if !dirConfirm {
 		installLocation, _ = promptForWowDirectory(base)
