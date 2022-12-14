@@ -2,46 +2,48 @@ package main
 
 import (
 	"fmt"
-	"os"
+	"github.com/pterm/pterm"
 	"io"
 	"log"
-	"runtime"
-	"regexp"
+	"os"
 	"path/filepath"
-	"github.com/pterm/pterm"
+	"regexp"
+	"runtime"
 	"strings"
-	// "github.com/pterm/pterm/putils" 
+	// "github.com/pterm/pterm/putils"
 )
 
 type WowInstall struct {
 	availableVersions []string
-	installDirectory string
+	installDirectory  string
 }
 
 type Wtf struct {
-	account string
-	server string
+	account   string
+	server    string
 	character string
 }
 
 type CopyTarget struct {
-	wtf Wtf
+	wtf     Wtf
 	version string
 }
 
 // smelly?
 var _wowInstanceFolderNames = map[string]string{
-		"_classic_": "WoTLK Classic",
-		"_classic_ptr_": "WoTLK Classic PTR",
-		"_classic_beta_": "WoTLK Classic Beta",
-		"_retail_": "Retail",
-	}
+	"_classic_":        "WoTLK Classic",
+	"_classic_ptr_":    "WoTLK Classic PTR",
+	"_classic_beta_":   "WoTLK Classic Beta",
+	"_classic_era_":    "Classic SoM",
+	"_classic_era_ptr": "Classic SoM PTR",
+	"_retail_":         "Retail",
+	"_ptr_":            "Retail PTR",
+}
 
 var _probableWowInstallLocations = map[string]string{
-		"darwin": "/Applications/World of Warcraft",
-		"windows": "C:\\Program Files (x86)\\World of Warcraft",
-	}
-
+	"darwin":  "/Applications/World of Warcraft",
+	"windows": "C:\\Program Files (x86)\\World of Warcraft",
+}
 
 //
 //
@@ -79,8 +81,8 @@ func (wow WowInstall) getWtfConfigurations(version string) []Wtf {
 					for _, character := range characterFiles { // any subdirectories of the server directories are characters, they have arbitrary names
 						if character.IsDir() {
 							finalWtf := Wtf{
-								account: acct.Name(),
-								server: server.Name(),
+								account:   acct.Name(),
+								server:    server.Name(),
 								character: character.Name(),
 							}
 							configurations = append(configurations, finalWtf)
@@ -230,8 +232,8 @@ func (wow WowInstall) selectWtf(isSource bool) CopyTarget {
 
 	return CopyTarget{
 		wtf: Wtf{
-			account: chosenAccount,
-			server: chosenServer,
+			account:   chosenAccount,
+			server:    chosenServer,
 			character: chosenCharacter,
 		},
 		version: wowVersion,
@@ -297,7 +299,7 @@ func promptForWowDirectory(dir string) (wowDir string, err error) {
 	}
 }
 
-// deduplicates slices by throwing them into a map 
+// deduplicates slices by throwing them into a map
 // not mine, credit to @kylewbanks
 func deduplicateStringSlice(input []string) []string {
 	u := make([]string, 0, len(input))
@@ -344,7 +346,7 @@ func main() {
 	installLocation := _probableWowInstallLocations[runtime.GOOS]
 	base := "/"
 
-	dirOk := isWowInstallDirectory(installLocation);
+	dirOk := isWowInstallDirectory(installLocation)
 	if !dirOk {
 		if runtime.GOOS == "windows" {
 			baseInput, _ := pterm.DefaultInteractiveTextInput.
@@ -352,7 +354,7 @@ func main() {
 				Show()
 			base = fmt.Sprintf("%s:\\", string(baseInput[0]))
 		}
-		installLocation, _ = promptForWowDirectory(base);
+		installLocation, _ = promptForWowDirectory(base)
 	}
 
 	pterm.Success.Printfln("Found WoW install. Location: %s", installLocation)
