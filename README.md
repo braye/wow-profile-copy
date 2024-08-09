@@ -4,6 +4,12 @@ This TUI utility provides an easy way to copy addon settings, keybinds, and macr
 
 It does not currently copy client settings (graphics, sound levels, etc) between versions of the game.
 
+## Backups
+
+This software overwrites large amounts of configuration data automatically. There is no "undo". For that reason, before you copy profiles around, you should consider taking a backup.
+
+To do that, simply copy the entire `WTF` folder in the version folder that you're going to be copying to (e.g. `_classic_ptr_`) to somewhere safe before running the tool.
+
 # FAQ
 
 ## My keybinds aren't copying correctly!
