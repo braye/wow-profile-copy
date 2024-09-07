@@ -32,6 +32,7 @@ var _wowInstanceFolderNames = map[string]string{
 	"_classic_era_ptr": "Classic Era PTR",
 	"_retail_":         "Retail",
 	"_ptr_":            "Retail PTR",
+	"_xptr_":			"Retail PTR 2",
 }
 
 var _probableWowInstallLocations = map[string]string{
