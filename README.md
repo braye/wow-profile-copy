@@ -36,3 +36,7 @@ Change *any* key binding, and apply the changes - you can change it back later.
 This "tricks" the WoW client into accepting the new keybindings, and saving them to Blizzard's servers. Otherwise, it sees that the keybindings for the account don't match the ones saved on the server, and "helpfully" changes them.
 
 Leaving `synchronizeBindings` turned off entirely also solves the issue.
+
+## How do I copy the spell placements on my hotbars?
+
+As far as I can tell, spell -> bar slot assignments are saved to the realm. That means there's no way for this tool to copy them, because the data doesn't exist on your computer. However, something like [MySlot](https://github.com/tg123/myslot) can help with that.
