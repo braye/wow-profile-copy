@@ -23,18 +23,6 @@ type CopyTarget struct {
 	version string
 }
 
-// smelly?
-var _wowInstanceFolderNames = map[string]string{
-	"_classic_":        "Classic",
-	"_classic_ptr_":    "Classic PTR",
-	"_classic_beta_":   "Classic Beta",
-	"_classic_era_":    "Classic Era",
-	"_classic_era_ptr": "Classic Era PTR",
-	"_retail_":         "Retail",
-	"_ptr_":            "Retail PTR",
-	"_xptr_":			"Retail PTR 2",
-}
-
 var _probableWowInstallLocations = map[string]string{
 	"darwin":  "/Applications/World of Warcraft",
 	"windows": "C:\\Program Files (x86)\\World of Warcraft",
@@ -94,13 +82,13 @@ func main() {
 
 	pterm.Info.Printfln(
 		"Source: { Version: %s, Account: %s, Server: %s, Character: %s }",
-		_wowInstanceFolderNames[srcConfig.version],
+		srcConfig.version,
 		srcConfig.wtf.account,
 		srcConfig.wtf.server,
 		srcConfig.wtf.character)
 	pterm.Info.Printfln(
 		"Destination: { Version: %s, Account :%s, Server: %s, Character: %s }",
-		_wowInstanceFolderNames[dstConfig.version],
+		dstConfig.version,
 		dstConfig.wtf.account,
 		dstConfig.wtf.server,
 		dstConfig.wtf.character)
@@ -136,7 +124,7 @@ func main() {
 		pterm.Warning.Println("Skipping account-level copying - accounts are the same.")
 	} else {
 		// client configuration
-		accountFilesToCopy := [3]string{"bindings-cache.wtf", "config-cache.wtf", "macros-cache.txt"}
+		accountFilesToCopy := [4]string{"bindings-cache.wtf", "config-cache.wtf", "macros-cache.txt", "edit-mode-cache-account.txt"}
 	
 		for _, file := range accountFilesToCopy {
 			src := filepath.Join(srcWtfAccountPath, file)
@@ -179,7 +167,7 @@ func main() {
 	srcWtfCharacterPath := filepath.Join(srcWtfAccountPath, srcConfig.wtf.server, srcConfig.wtf.character)
 	dstWtfCharacterPath := filepath.Join(dstWtfAccountPath, dstConfig.wtf.server, dstConfig.wtf.character)
 
-	characterFilesToCopy := [4]string{"AddOns.txt", "config-cache.wtf", "layout-local.txt", "macros-cache.txt"}
+	characterFilesToCopy := [5]string{"AddOns.txt", "config-cache.wtf", "layout-local.txt", "macros-cache.txt", "edit-mode-cache-character.txt"}
 
 	for _, file := range characterFilesToCopy {
 		src := filepath.Join(srcWtfCharacterPath, file)

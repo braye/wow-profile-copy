@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // deduplicates slices by throwing them into a map
@@ -55,8 +56,8 @@ func isWowInstallDirectory(dir string) bool {
 
 	for _, file := range files {
 		// if this directory contains a wow instance folder name, it's probably where WoW is installed
-		_, matchesInstanceName := _wowInstanceFolderNames[file.Name()]
-		if file.IsDir() && matchesInstanceName {
+		// wow folders are named like _version_
+		if file.IsDir() && strings.HasPrefix(file.Name(), "_") && strings.HasSuffix(file.Name(), "_") {
 			isInstallDir = true
 			break
 		}
