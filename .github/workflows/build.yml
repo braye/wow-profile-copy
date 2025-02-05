@@ -48,7 +48,7 @@ jobs:
           delete-merged: true
 
   release:
-    runs-on: ubunu-latest
+    runs-on: ubuntu-latest
     needs: merge
     permissions:
       contents: write
