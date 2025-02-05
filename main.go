@@ -36,7 +36,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pterm.DefaultHeader.WithFullWidth().Println("wow-profile-copy 0.3.0")
+	pterm.DefaultHeader.WithFullWidth().Println("wow-profile-copy 0.4.0")
 
 	//
 	// prompts
